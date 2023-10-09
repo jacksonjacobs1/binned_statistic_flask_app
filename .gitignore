@@ -1,3 +1,5 @@
-pytables/
 benchmarks_env/
 benchmarks_output/*
+benchmarks_venv/
+flask_app/data_store/
+__pycache__/

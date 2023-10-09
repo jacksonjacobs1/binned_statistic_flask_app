@@ -27,6 +27,34 @@ def generate_xybins(xrange, yrange, xbins, ybins):
     ybins=np.linspace(yrange[0], yrange[1], ybins+1)
     return xbins, ybins
 
+import numpy as np
+
+def get_aggregator():
+    """
+    Returns a vectorized function that aggregates two elements by returning the first non-negative element.
+    If both elements are negative, it returns -1.
+
+    A -1 value is used to indicate that a bin is empty.
+    """
+    def aggregate(elem1,elem2):
+        if elem1 == -1:
+            return elem2
+        else:
+            return elem1
+    
+    return np.vectorize(aggregate)
+
+def generate_partitions(nitems, step_size, N, method='n_steps'):
+    # generate partitions based on N steps per partition
+    if method == 'n_steps':
+        partitions = np.arange(0, nitems, step_size * N)
+        if partitions[-1] != nitems:
+            partitions = np.append(partitions, nitems)
+
+    # generate partitions based on N partitions
+    if method == 'n_partitions':
+        partitions = np.linspace(0, nitems, N, dtype=int).tolist()
+    return partitions
 
 def histogrammap_scipy_bins(i, fname=None, xbins=None, ybins=None,step_size=None,randompercent=None, colval=None):
     with tables.open_file(fname, mode='r') as hdf5_file:
@@ -68,12 +96,12 @@ def histogrammap_scipy_bins(i, fname=None, xbins=None, ybins=None,step_size=None
             c=np.bincount(binnumber[idx],minlength=nbins)
             res[n,:]=c #output is a nclass x nbin matrix
 
-    return (counts,res,singlepoints)
+    return counts #(counts,res,singlepoints)
 
 # +
 if __name__ == '__main__':
     
-    fname="/home/jackson/research/code/binning_benchmarks/pytables/testData5h_1000000000.pytable"
+    fname="/home/jackson/code/research/binned_statistic_flask_app/flask_app/data_store/testData5h_1000000000.pytable"
     hdf5_file = tables.open_file(fname, mode='r')
     
 
@@ -101,15 +129,19 @@ if __name__ == '__main__':
     p=Pool(32)
     print("pool job exec")
     results=p.map(functools.partial(histogrammap_scipy_bins, fname=fname,xbins=xbins, ybins=ybins,
-                                    step_size=step_size,randompercent=None,colval='pred'),range(0, nitems, step_size))
-    counts= np.sum([r[0] for r in results],axis=0)
-    binpreds= np.sum([r[1] for r in results],axis=0)
-    singlepoints = [r[2] for r in results]
+                                    step_size=step_size,randompercent=None,colval=None),range(0, nitems, step_size))
+    
+    # counts= np.sum([r[0] for r in results],axis=0)
+    # binpreds= np.sum([r[1] for r in results],axis=0)
+    # singlepoints = [r[2] for r in results]
     
     end = time.time()
 
+    counts = np.sum(results, axis=0, dtype=np.int64)
+
     print(f"pool time {end-start} (s)")
     
-    print(counts)
-    print(np.sum(binpreds))
+    print(f'Total histogram counts: {counts.sum()}')
+    print(f'Histogram counts shape: {counts.shape}')
+    # print(np.sum(binpreds))
     #print(singlepoints)

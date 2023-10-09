@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+
+</head>
+<body>
+  <p id="test"></p>
+</body>
+<script>
+  const socket = new WebSocket('ws://' + location.host + '/render');
+  socket.addEventListener('message', ev => {
+    var elem = document.getElementById("test")
+    elem.innerHTML = JSON.parse(ev.data).message + "<br>"
+  })
+</script>
+</html>

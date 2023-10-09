@@ -17,7 +17,7 @@ import numpy as np
 import tables
 from tqdm.autonotebook import tqdm
 
-data = int(1e5)
+data = int(1e9)
 with tables.open_file(f"testData5h_{data}.pytable", mode='w') as hdf5_file:
 
     filters = tables.Filters(complevel=9,complib='blosc')
