@@ -3,12 +3,12 @@ from flask_sock import Sock
 import json
 import os
 import time
-from binning import histogrammap_scipy_bins, generate_xybins, generate_partitions
+from binning import histogrammap_scipy_bins, generate_xybins, generate_partitions, get_aggregator
 import tables
 import numpy as np
 from multiprocessing import Pool, cpu_count
 import functools
-
+import concurrent
 
 scatterAPI = Blueprint('scatterAPI', __name__, template_folder='templates')
 
@@ -25,7 +25,7 @@ def socket(ws):
 # call the render function with xy bounds: x0, x1, y0, y1
 @sock.route('/render')
 def render(ws):
-    filename = "./data_store/testData5h_1000000000.pytable"
+    filename = "/home/jackson/code/research/binned_statistic_flask_app/flask_app/data_store/indexedTestData_1000000000.pytable"
 
     # get the xy bounds from the request. TODO ADD THESE PARAMETERS TO THE REQUEST
     # xmin = request.args.get('x1', type=float)
@@ -51,11 +51,12 @@ def render(ws):
         xbins, ybins = generate_xybins([xmin, xmax], [ymin, ymax], nbins[0], nbins[1])
         partitions = generate_partitions(nitems, step_size, N=N_steps_per_partition, method='n_steps')
         # breakpoint()
-        cumulative_histogram = np.zeros((nbins[0], nbins[1]), dtype=np.int64)
+        cumulative_histogram = -1 * np.ones((nbins[0], nbins[1]), dtype=np.int64)
 
 
 
     # ----------------- BEGIN PARTITIONED MULTIPROCESSING ----------------- #
+    aggregator = get_aggregator()
     p=Pool(cpu_count())
     start = time.time()
     for i in range(len(partitions)-1):  # -1 needed because we are using i+1
@@ -64,24 +65,20 @@ def render(ws):
                                         ybins=ybins,
                                         step_size=step_size,
                                         randompercent=None,
-                                        colval='pred'),
+                                        colval='idx'),
                     range(partitions[i], partitions[i+1], step_size))
-        # breakpoint()
-        cumulative_histogram += np.sum(results, axis=0, dtype=np.int64)
-        
-        ws.send(json.dumps({'message': f'{int(cumulative_histogram.sum())} / {nitems}'}))
-        # ws.send(json.dumps({'message': 'step'}))
+
+        for result in results:
+            cumulative_histogram = aggregator(cumulative_histogram, result)
+
+        # cumulative_histogram += np.sum(results, axis=0, dtype=np.int64)
+        with tables.open_file(filename=filename, mode='r') as hdf5_file:
+            ws.send(json.dumps({'indices': cumulative_histogram.tolist(),
+                                'classes': hdf5_file.root.preds[cumulative_histogram.tolist].tolist()}))
+        ws.send(json.dumps({'indices': cumulative_histogram.tolist(),
+                            'classes': }))
 
     # ----------------- ALTERNATE MULTIPROCESSING METHOD ----------------- #
-    # results=p.map_async(functools.partial(histogrammap_scipy_bins, 
-    #                             fname=filename,xbins=xbins, 
-    #                             ybins=ybins,
-    #                             step_size=step_size,
-    #                             randompercent=None,
-    #                             colval='pred'),
-    #         range(0, nitems, step_size))
-
-    # while 
 
     # -------------------------------------------------------------------- #
     

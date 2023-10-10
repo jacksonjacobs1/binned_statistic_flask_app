@@ -27,7 +27,9 @@ def generate_xybins(xrange, yrange, xbins, ybins):
     ybins=np.linspace(yrange[0], yrange[1], ybins+1)
     return xbins, ybins
 
-import numpy as np
+def statistic(arr):
+    return int(arr[0]) if len(arr) else -1
+
 
 def get_aggregator():
     """
@@ -70,31 +72,31 @@ def histogrammap_scipy_bins(i, fname=None, xbins=None, ybins=None,step_size=None
         if colval:
             chunkval=chunkval[idx]
 
-    counts, xedges, yedges, binnumber=binned_statistic_2d(chunkx, chunky,None,statistic='count',bins=[xbins,ybins])
+    counts, xedges, yedges, binnumber=binned_statistic_2d(chunkx, chunky, chunkval, statistic=statistic, bins=[xbins,ybins])
 
     
     #--- identify bins which only have a single point, these are not "superpoints" but regular points and should be presented seperately
-    xx,yy=(counts==1).nonzero()
-    if len(xx)>0:
-        #print(f'lencoiunt:{len(xx)}')
-        xx+=1 #compensate for the "too small" bin
-        yy+=1
+    # xx,yy=(counts==1).nonzero()
+    # if len(xx)>0:
+    #     #print(f'lencoiunt:{len(xx)}')
+    #     xx+=1 #compensate for the "too small" bin
+    #     yy+=1
 
-        pointbins=np.ravel_multi_index([xx,yy],[len(xbins)+1,len(ybins)+1])
-        singlepoints=np.where(np.isin(binnumber,pointbins))[0]+i #--- these points should be presented as "points", note they are offset by "i"
-    else:
-        singlepoints=None
+    #     pointbins=np.ravel_multi_index([xx,yy],[len(xbins)+1,len(ybins)+1])
+    #     singlepoints=np.where(np.isin(binnumber,pointbins))[0]+i #--- these points should be presented as "points", note they are offset by "i"
+    # else:
+    #     singlepoints=None
     
-    res=None
-    if colval: #if we want statistics of a particular column, e.g., pred or GT, or whatever, this will do it
-        nclass=3 #-- should be from config file
-        nbins = (len(xbins)+1)*(len(ybins)+1)
-        res=np.zeros((nclass,nbins),dtype=np.int64)
+    # res=None
+    # if colval: #if we want statistics of a particular column, e.g., pred or GT, or whatever, this will do it
+    #     nclass=3 #-- should be from config file
+    #     nbins = (len(xbins)+1)*(len(ybins)+1)
+    #     res=np.zeros((nclass,nbins),dtype=np.int64)
 
-        for n in range(nclass):
-            idx=chunkval==(n+1)
-            c=np.bincount(binnumber[idx],minlength=nbins)
-            res[n,:]=c #output is a nclass x nbin matrix
+    #     for n in range(nclass):
+    #         idx=chunkval==(n+1)
+    #         c=np.bincount(binnumber[idx],minlength=nbins)
+    #         res[n,:]=c #output is a nclass x nbin matrix
 
     return counts #(counts,res,singlepoints)
 
