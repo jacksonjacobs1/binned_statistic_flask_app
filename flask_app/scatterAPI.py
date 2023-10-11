@@ -3,7 +3,7 @@ from flask_sock import Sock
 import json
 import os
 import time
-from binning import histogrammap_scipy_bins, generate_xybins, generate_partitions, get_aggregator
+from binning import histogrammap_scipy_bins, generate_xybins, generate_partitions, get_aggregator, get_info
 import tables
 import numpy as np
 from multiprocessing import Pool, cpu_count
@@ -25,7 +25,7 @@ def socket(ws):
 # call the render function with xy bounds: x0, x1, y0, y1
 @sock.route('/render')
 def render(ws):
-    filename = "/home/jackson/code/research/binned_statistic_flask_app/flask_app/data_store/indexedTestData_1000000000.pytable"
+    filename = "/home/jackson/code/research/binned_statistic_flask_app/flask_app/data_store/1000000001_points.pytable"
 
     # get the xy bounds from the request. TODO ADD THESE PARAMETERS TO THE REQUEST
     # xmin = request.args.get('x1', type=float)
@@ -37,7 +37,7 @@ def render(ws):
     xmax = 1
     ymin = 0
     ymax = 1
-    N_steps_per_partition = 100
+    N_steps_per_partition = 50
 
     # loop through each chunk of data and send it to the client
 
@@ -45,7 +45,7 @@ def render(ws):
     with tables.open_file(filename=filename, mode='r') as hdf5_file:
         col_x = hdf5_file.root.embed_x
         col_y = hdf5_file.root.embed_y
-        nitems = len(col_x)
+        nitems = len(col_x) - 1 # exclude the fake point at the end
         step_size = col_x.chunkshape[0]
         nbins = (100, 100) 
         xbins, ybins = generate_xybins([xmin, xmax], [ymin, ymax], nbins[0], nbins[1])
@@ -53,7 +53,7 @@ def render(ws):
         # breakpoint()
         cumulative_histogram = -1 * np.ones((nbins[0], nbins[1]), dtype=np.int64)
 
-
+    print(f'number of partitions: {len(partitions)-1}')
 
     # ----------------- BEGIN PARTITIONED MULTIPROCESSING ----------------- #
     aggregator = get_aggregator()
@@ -67,20 +67,29 @@ def render(ws):
                                         randompercent=None,
                                         colval='idx'),
                     range(partitions[i], partitions[i+1], step_size))
-
+        print(i)
+        
         for result in results:
             cumulative_histogram = aggregator(cumulative_histogram, result)
 
-        # cumulative_histogram += np.sum(results, axis=0, dtype=np.int64)
-        with tables.open_file(filename=filename, mode='r') as hdf5_file:
-            ws.send(json.dumps({'indices': cumulative_histogram.tolist(),
-                                'classes': hdf5_file.root.preds[cumulative_histogram.tolist].tolist()}))
-        ws.send(json.dumps({'indices': cumulative_histogram.tolist(),
-                            'classes': }))
+        # get the filtered color matrix.
+        ids = cumulative_histogram.flatten().tolist()
+        
+        # replace all nan values with -1
+        # this operation multiplies the time by 2
+        ids = [-1 if np.isnan(x) else int(x) for x in ids]
+
+        colors = get_info(ids, filename)
+
+        ws.send(json.dumps({'indices': ids,
+                            'colors': colors,
+                            'iteration:': i}))
+        
+
 
     # ----------------- ALTERNATE MULTIPROCESSING METHOD ----------------- #
 
     # -------------------------------------------------------------------- #
     
     end = time.time()
-    ws.send(json.dumps({'message': f'pool time {end-start} (s)'}))
+    print(end-start)

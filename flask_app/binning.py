@@ -28,8 +28,8 @@ def generate_xybins(xrange, yrange, xbins, ybins):
     return xbins, ybins
 
 def statistic(arr):
-    return int(arr[0]) if len(arr) else -1
-
+    # return arr[0] if len(arr) else -1
+    return len(arr)
 
 def get_aggregator():
     """
@@ -58,6 +58,24 @@ def generate_partitions(nitems, step_size, N, method='n_steps'):
         partitions = np.linspace(0, nitems, N, dtype=int).tolist()
     return partitions
 
+def get_info(ids, fname, query=None):
+    """
+    Returns information for the given ids from the specified HDF5 file, based on a filtering query.
+    
+    Args:
+        ids (list): A list of ids for which to retrieve prediction data.
+        fname (str): The path to the HDF5 file containing the prediction data.
+        query (str, optional): A query string to filter the prediction data. Defaults to None.
+    
+    Returns:
+        numpy.ndarray: An array of prediction data for the given ids.
+    """
+    if query == "placeholder":
+        pass
+    else:
+        with tables.open_file(fname, mode='r') as hdf5_file:
+            return hdf5_file.root.pred[ids].tolist()
+
 def histogrammap_scipy_bins(i, fname=None, xbins=None, ybins=None,step_size=None,randompercent=None, colval=None):
     with tables.open_file(fname, mode='r') as hdf5_file:
         chunkx = hdf5_file.root.embed_x[i:i + step_size]
@@ -65,14 +83,14 @@ def histogrammap_scipy_bins(i, fname=None, xbins=None, ybins=None,step_size=None
         if colval:
             chunkval = hdf5_file.root[colval][i:i + step_size] 
 
-    if randompercent: #--- using a subset via sampling will result in faster speed, but less accuracy
-        idx=np.random.randint(0,len(chunkx),int(len(chunkx)*randompercent)) #-- note,faster to load the entire chucnk and then subset, versus subsetting directly
-        chunkx=chunkx[idx]
-        chunky=chunky[idx]
-        if colval:
-            chunkval=chunkval[idx]
+    # if randompercent: #--- using a subset via sampling will result in faster speed, but less accuracy
+    #     idx=np.random.randint(0,len(chunkx),int(len(chunkx)*randompercent)) #-- note,faster to load the entire chucnk and then subset, versus subsetting directly
+    #     chunkx=chunkx[idx]
+    #     chunky=chunky[idx]
+    #     if colval:
+    #         chunkval=chunkval[idx]
 
-    counts, xedges, yedges, binnumber=binned_statistic_2d(chunkx, chunky, chunkval, statistic=statistic, bins=[xbins,ybins])
+    counts, xedges, yedges, binnumber=binned_statistic_2d(chunkx, chunky, chunkval, statistic='max', bins=[xbins,ybins])
 
     
     #--- identify bins which only have a single point, these are not "superpoints" but regular points and should be presented seperately

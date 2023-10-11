@@ -7,12 +7,18 @@
 </head>
 <body>
   <p id="test"></p>
+  <p id="counter"></p>
 </body>
 <script>
   const socket = new WebSocket('ws://' + location.host + '/render');
   socket.addEventListener('message', ev => {
     var elem = document.getElementById("test")
-    elem.innerHTML = JSON.parse(ev.data).message + "<br>"
+    var elem2 = document.getElementById("counter")
+    const json = JSON.parse(ev.data)
+
+
+    elem.innerHTML = json.colors + "<br>"
+    elem2.innerHTML = json.iteration + "<br>"
   })
 </script>
 </html>
